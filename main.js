@@ -341,8 +341,10 @@ function buildStationList() {
     const el = document.createElement("div");
     el.className = "station";
     el.dataset.genre = genre;
-    el.innerHTML = '<span class="name"><span class="swatch" style="color:hsl(' + hue + ",80%,60%);background:hsl(" + hue + ",80%,60%)"></span>' +
-      genre.replace(/_/g, " ") + "</span><span class="count\">" + count + "</span>";
+    const sw = "hsl(" + hue + ",80%,60%)";
+    el.innerHTML =
+      `<span class="name"><span class="swatch" style="color:${sw};background:${sw}"></span>` +
+      genre.replace(/_/g, " ") + `</span><span class="count">${count}</span>`;
     el.onclick = () => selectGenre(genre);
     stationList.appendChild(el);
   }
