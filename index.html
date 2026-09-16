@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIGNAL — Radio Hub</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- brand -->
+  <header id="brand">
+    <h1>SIGNAL<span class="dot">.</span></h1>
+    <p class="tag">radio hub &middot; 564 original tracks &middot; pick a station or a vibe</p>
+  </header>
+
+  <!-- search + surprise -->
+  <div id="topbar">
+    <input id="search" type="search" placeholder="search title or genre…" autocomplete="off" />
+    <button id="surprise" title="play a random track from the current filter">&#9855; surprise me</button>
+  </div>
+
+  <!-- genre stations list -->
+  <nav id="stations" aria-label="genre stations">
+    <div class="panel-head">
+      <span>stations</span>
+      <button id="stations-toggle" aria-label="toggle stations list">&times;</button>
+    </div>
+    <div id="station-list" class="scroll"></div>
+  </nav>
+  <button id="stations-open" hidden>&#9776; stations</button>
+
+  <!-- mood / vibe chips -->
+  <div id="vibes" aria-label="mood vibes">
+    <div class="panel-head"><span>feel like</span></div>
+    <div id="vibe-chips" class="chips scroll"></div>
+  </div>
+
+  <!-- now playing -->
+  <footer id="nowplaying" class="glass">
+    <div id="np-meta">
+      <div id="np-title">not tuned in</div>
+      <div id="np-sub"><span id="np-genre"></span><span id="np-moods" class="moods"></span></div>
+    </div>
+    <div id="np-center">
+      <div id="np-buttons">
+        <button id="btn-prev" title="previous">&#9198;</button>
+        <button id="btn-play" title="play / pause">&#9654;</button>
+        <button id="btn-next" title="next">&#9197;</button>
+        <button id="btn-shuffle" class="on" title="shuffle">&#10227;</button>
+      </div>
+      <div id="np-progress">
+        <div id="np-bar"><div id="np-fill"></div></div>
+        <span id="np-time">0:00 / 0:00</span>
+      </div>
+    </div>
+    <div id="np-vol">
+      <span>&#128266;</span>
+      <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" />
+    </div>
+  </footer>
+
+  <div id="status" class="glass"><span id="status-dot"></span><span id="status-text">connecting…</span></div>
+
+  <div id="loading" class="glass"><div class="spinner"></div><p>loading the signal…</p></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
