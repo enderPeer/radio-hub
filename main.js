@@ -1,22 +1,47 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+// ---------------------------------------------------------------- fatal reporting
+function showFatal(err) {
+  const el = document.getElementById("loading");
+  const msg = (err && (err.message || String(err))) || "unknown error";
+  if (el) {
+    el.classList.remove("hidden");
+    el.innerHTML =
+      '<div style="max-width:560px;text-align:center;padding:0 22px">' +
+      '<h2 style="margin:0 0 12px;color:#ff5d7a;letter-spacing:3px">SIGNAL OFFLINE</h2>' +
+      '<p style="color:#e8eefc;white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.5">' + msg + "</p>" +
+      '<p style="color:#8fa0c0;font-size:13px;margin-top:14px">Reload the page. If it persists, the audio backend or your connection may be down.</p></div>';
+  }
+  if (window.console) console.error("SIGNAL fatal:", err);
+}
+window.addEventListener("error", (e) => showFatal(e.message || e.error));
+window.addEventListener("unhandledrejection", (e) => showFatal(e.reason));
+
+try {
 // ---------------------------------------------------------------- config
 async function loadConfig() {
-  const r = await fetch("config.json", { cache: "no-store" });
-  return r.json();
+  try {
+    const r = await fetch("config.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("config.json http " + r.status);
+    return await r.json();
+  } catch (e) {
+    throw new Error("could not load config.json: " + (e.message || e));
+  }
 }
 async function loadCatalog(cfg) {
   const bases = [cfg.audioBase, cfg.lanFallback].filter(Boolean);
+  const errs = [];
   for (const base of bases) {
     try {
       const r = await fetch(base + "/catalog.json", { cache: "no-store" });
       if (!r.ok) throw new Error("http " + r.status);
       const data = await r.json();
       if (Array.isArray(data) && data.length) { return { data, base }; }
-    } catch (e) { /* try next base */ }
+      throw new Error("empty catalog");
+    } catch (e) { errs.push(base + "  ->  " + (e.message || e)); }
   }
-  throw new Error("no catalog source reachable");
+  throw new Error("no catalog source reachable:\n" + errs.join("\n"));
 }
 
 // ---------------------------------------------------------------- state
@@ -420,6 +445,7 @@ buildStationList();
 buildVibes();
 syncUI();
 setStatus(true, CATALOG.length + " tracks · via " + (AUDIO_BASE.includes("trycloudflare") ? "tunnel" : "LAN"));
+if (window.__signalBootTimeout) { clearTimeout(window.__signalBootTimeout); window.__signalBootTimeout = null; }
 document.getElementById("loading").classList.add("hidden");
 applyFilter(true);
 
@@ -457,3 +483,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+} catch (e) {
+  showFatal(e);
+}
