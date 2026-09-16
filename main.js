@@ -488,6 +488,8 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+
+export { CONFIG };
 } catch (e) {
   showFatal(e);
 }

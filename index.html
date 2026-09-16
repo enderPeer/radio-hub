@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SIGNAL v1.0.1 — Radio Hub</title>
+  <title>SIGNAL v1.1.0 — Radio Hub</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="chat.css" />
 </head>
 <body>
   <canvas id="scene"></canvas>
@@ -12,7 +13,7 @@
   <!-- brand -->
   <header id="brand">
     <h1>SIGNAL<span class="dot">.</span></h1>
-    <p class="tag">radio hub v1.0.1 &middot; 564 original tracks &middot; pick a station or a vibe</p>
+    <p class="tag">radio hub v1.1.0 &middot; 564 original tracks + user requests &middot; pick a station or a vibe</p>
   </header>
 
   <!-- search + surprise -->
@@ -35,6 +36,44 @@
   <div id="vibes" aria-label="mood vibes">
     <div class="panel-head"><span>feel like</span></div>
     <div id="vibe-chips" class="chips scroll"></div>
+  </div>
+
+  <!-- chat window -->
+  <div id="chat-window">
+    <div id="chat-header">
+      <h3>song requests</h3>
+      <button id="chat-toggle" title="toggle chat">&#8895;</button>
+    </div>
+    <div id="chat-messages">
+      <div class="chat-message">
+        <span class="user">System</span><span class="time">now</span>
+        <div class="content">Welcome to SIGNAL! Request songs to be generated and published to the radio.</div>
+      </div>
+    </div>
+    <div id="chat-input-area">
+      <input id="chat-input" type="text" placeholder="request a song..." />
+      <button id="chat-send">send</button>
+    </div>
+  </div>
+
+  <!-- playlist section -->
+  <div id="playlist-section" class="hidden">
+    <div id="playlist-header">
+      <h3>my playlist</h3>
+      <div id="playlist-controls">
+        <button id="playlist-add-btn" title="add song">&#10010;</button>
+      </div>
+    </div>
+    <div id="playlist-list">
+      <div style="padding: 12px; text-align: center; color: var(--muted); font-size: 11px;">
+        No songs in playlist
+      </div>
+    </div>
+    <div id="playlist-add-form">
+      <input type="text" id="playlist-song-input" placeholder="song title/artist" />
+      <button id="playlist-add-submit">add to playlist</button>
+      <button id="playlist-cancel" style="margin-top: 6px; background: none; border: none; color: var(--muted); font-size: 10px; cursor: pointer;">cancel</button>
+    </div>
   </div>
 
   <!-- now playing -->
@@ -97,6 +136,7 @@
       }
     }, 25000);
   </script>
-  <script type="module" src="main.js?v=1.0.1"></script>
+  <script type="module" src="main.js?v=1.1.0"></script>
+  <script type="module" src="chat.js?v=1.1.0"></script>
 </body>
 </html>
