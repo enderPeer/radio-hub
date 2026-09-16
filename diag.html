@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>diag</title></head>
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+  const out = document.getElementById("out");
+  const log = (s) => { out.textContent += s + "\n"; };
+  log("ua: " + navigator.userAgent);
+  log("importmap supported: " + (typeof HTMLScriptElement !== "undefined"));
+  try { const m = await import("./vendor/three.module.js"); log("three.module.js OK keys=" + Object.keys(m).length + " REVISION=" + m.REVISION); }
+  catch (e) { log("three.module.js FAIL " + e.name + ": " + e.message); }
+  try { const m = await import("./vendor/controls/OrbitControls.js"); log("OrbitControls.js OK keys=" + Object.keys(m).length); }
+  catch (e) { log("OrbitControls.js FAIL " + e.name + ": " + e.message); }
+  try { const m = await import("./main.js"); log("main.js OK (booted)"); }
+  catch (e) { log("main.js FAIL " + e.name + ": " + e.message); }
+  log("DONE");
+</script>
+</body>
+</html>
