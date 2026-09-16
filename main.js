@@ -15,14 +15,17 @@ function showFatal(err) {
   }
   if (window.console) console.error("SIGNAL fatal:", err);
 }
-window.addEventListener("error", (e) => showFatal(e.message || e.error));
-window.addEventListener("unhandledrejection", (e) => showFatal(e.reason));
 
 try {
 // ---------------------------------------------------------------- config
+function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { cache: "no-store", signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
 async function loadConfig() {
   try {
-    const r = await fetch("config.json", { cache: "no-store" });
+    const r = await fetchWithTimeout("config.json", 8000);
     if (!r.ok) throw new Error("config.json http " + r.status);
     return await r.json();
   } catch (e) {
@@ -34,7 +37,7 @@ async function loadCatalog(cfg) {
   const errs = [];
   for (const base of bases) {
     try {
-      const r = await fetch(base + "/catalog.json", { cache: "no-store" });
+      const r = await fetchWithTimeout(base + "/catalog.json", 6000);
       if (!r.ok) throw new Error("http " + r.status);
       const data = await r.json();
       if (Array.isArray(data) && data.length) { return { data, base }; }

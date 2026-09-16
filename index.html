@@ -69,26 +69,42 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/"
     }
   }
   </script>
   <script>
-    // Fallback: if the app module has not hidden the loading screen within 12s,
-    // show a diagnostic hint. Covers import/CDN/network/WebGL failures that a
-    // try/catch inside the module cannot see.
+    // Runs BEFORE the module, so it also surfaces static-import / parse failures
+    // that a handler inside the module can never see (the module body would not
+    // have run yet). It only acts while the loading overlay is still visible.
+    window.__signalFatal = function (msg) {
+      var el = document.getElementById("loading");
+      if (!el || el.classList.contains("hidden")) return;
+      el.innerHTML =
+        '<div style="max-width:560px;text-align:center;padding:0 22px">' +
+        '<h2 style="margin:0 0 12px;color:#ff5d7a;letter-spacing:3px">SIGNAL OFFLINE</h2>' +
+        '<p style="color:#e8eefc;white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.5">' + msg + '</p>' +
+        '<p style="color:#8fa0c0;font-size:13px;margin-top:14px">Reload the page. If it persists, the audio backend or your connection may be down.</p></div>';
+    };
+    window.addEventListener("error", function (e) {
+      window.__signalFatal((e.message) || (e.error && e.error.message) || "unknown error");
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      var r = e.reason;
+      window.__signalFatal((r && (r.message || String(r))) || "unknown error");
+    });
+    // Last-resort fallback: if the app still has not booted after 25s, say so.
     window.__signalBootTimeout = setTimeout(function () {
       var el = document.getElementById("loading");
       if (el && !el.classList.contains("hidden")) {
         el.innerHTML =
           '<div style="max-width:560px;text-align:center;padding:0 22px">' +
           '<h2 style="margin:0 0 12px;color:#ff5d7a;letter-spacing:3px">SIGNAL STILL LOADING</h2>' +
-          '<p style="color:#e8eefc;font-size:14px;line-height:1.6">The 3D app did not start within 12 seconds.</p>' +
-          '<p style="color:#8fa0c0;font-size:13px;line-height:1.7">Open the browser console (F12 &rarr; Console) for the exact error.<br>' +
-          'Common causes: WebGL disabled, a blocked CDN, or a network problem.</p></div>';
+          '<p style="color:#e8eefc;font-size:14px;line-height:1.6">The 3D app did not start within 25 seconds.</p>' +
+          '<p style="color:#8fa0c0;font-size:13px;line-height:1.7">Check your connection, then reload. Open the browser console (F12) for details.</p></div>';
       }
-    }, 12000);
+    }, 25000);
   </script>
   <script type="module" src="main.js"></script>
 </body>
