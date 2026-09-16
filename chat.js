@@ -244,16 +244,26 @@ export const chatSystem = {
   },
 
   setupAutoRefresh() {
-    const checkInterval = setInterval(() => {
-      fetch(CONFIG.audioBase + '/catalog.json?_=' + Date.now())
-        .then(r => r.json())
+    // Only reload when the catalog actually grows (a new song was published,
+    // e.g. a user request finished generating). The first check just records
+    // the baseline count, so it never reloads on its own.
+    this.catalogCount = null;
+    const check = () => {
+      fetch(CONFIG.audioBase + '/catalog.json?_=' + Date.now(), { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null))
         .then(data => {
-          if (data.length !== this.messages.length) {
-            window.location.reload();
+          if (!Array.isArray(data)) return;
+          if (this.catalogCount === null) {
+            this.catalogCount = data.length; // baseline — no reload
+          } else if (data.length > this.catalogCount) {
+            this.catalogCount = data.length;
+            window.location.reload(); // a new song was added
           }
         })
         .catch(() => {});
-    }, 10000);
+    };
+    check(); // take the baseline immediately
+    this.autoRefreshTimer = setInterval(check, 12000);
   },
 
   addPlaylistItem(song) {
