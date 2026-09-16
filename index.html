@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SIGNAL v1.1.2 — Radio Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>SIGNAL v1.2.0 — Radio Hub</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="chat.css" />
 </head>
@@ -19,14 +19,14 @@
   <!-- search + surprise -->
   <div id="topbar">
     <input id="search" type="search" placeholder="search title or genre…" autocomplete="off" />
-    <button id="surprise" title="play a random track from the current filter">&#9855; surprise me</button>
+    <button id="surprise" title="play a random track from the current filter"><span class="die">&#9855;</span><span class="word">surprise me</span></button>
   </div>
 
-  <!-- genre stations list -->
+  <!-- genre stations list (drawer on mobile) -->
   <nav id="stations" aria-label="genre stations">
     <div class="panel-head">
       <span>stations</span>
-      <button id="stations-toggle" aria-label="toggle stations list">&times;</button>
+      <button id="stations-toggle" aria-label="close stations list">&times;</button>
     </div>
     <div id="station-list" class="scroll"></div>
   </nav>
@@ -38,69 +38,71 @@
     <div id="vibe-chips" class="chips scroll"></div>
   </div>
 
-  <!-- chat window -->
-  <div id="chat-window">
+  <!-- chat window: song requests + my playlist (bottom sheet on mobile) -->
+  <div id="chat-window" class="open">
     <div id="chat-header">
-      <h3>song requests</h3>
-      <button id="chat-toggle" title="toggle chat">&#8895;</button>
+      <div class="chat-tabs">
+        <button class="chat-tab active" data-tab="requests">requests</button>
+        <button class="chat-tab" data-tab="playlist">playlist</button>
+      </div>
+      <button id="chat-close" aria-label="close chat">&times;</button>
     </div>
-    <div id="chat-messages">
-      <div class="chat-message">
-        <span class="user">System</span><span class="time">now</span>
-        <div class="content">Welcome to SIGNAL! Request songs to be generated and published to the radio.</div>
+
+    <div id="chat-tab-requests" class="chat-tab-page">
+      <div id="chat-messages">
+        <div class="chat-message">
+          <span class="user">System</span><span class="time">now</span>
+          <div class="content">Welcome to SIGNAL! Describe the song you want and the studio on Adler composes it, then it lands right here on the radio.</div>
+        </div>
+      </div>
+      <div id="chat-input-area">
+        <input id="chat-input" type="text" placeholder="request a song, e.g. dark dubstep about neon rain" />
+        <button id="chat-send">send</button>
       </div>
     </div>
-    <div id="chat-input-area">
-      <input id="chat-input" type="text" placeholder="request a song..." />
-      <button id="chat-send">send</button>
+
+    <div id="chat-tab-playlist" class="chat-tab-page hidden">
+      <div id="playlist-list">
+        <div class="playlist-empty">No songs in your playlist yet.</div>
+      </div>
+      <div id="playlist-add-form">
+        <input type="text" id="playlist-song-input" placeholder="song title / artist" />
+        <div class="playlist-form-row">
+          <button id="playlist-add-submit">add to playlist</button>
+          <button id="playlist-cancel">cancel</button>
+        </div>
+      </div>
+      <button id="playlist-add-btn">+ add song to playlist</button>
     </div>
   </div>
 
-  <!-- playlist section -->
-  <div id="playlist-section" class="hidden">
-    <div id="playlist-header">
-      <h3>my playlist</h3>
-      <div id="playlist-controls">
-        <button id="playlist-add-btn" title="add song">&#10010;</button>
-      </div>
-    </div>
-    <div id="playlist-list">
-      <div style="padding: 12px; text-align: center; color: var(--muted); font-size: 11px;">
-        No songs in playlist
-      </div>
-    </div>
-    <div id="playlist-add-form">
-      <input type="text" id="playlist-song-input" placeholder="song title/artist" />
-      <button id="playlist-add-submit">add to playlist</button>
-      <button id="playlist-cancel" style="margin-top: 6px; background: none; border: none; color: var(--muted); font-size: 10px; cursor: pointer;">cancel</button>
-    </div>
-  </div>
+  <!-- floating action button (mobile) -->
+  <button id="fab-chat" aria-label="open song requests">&#127908;</button>
 
-  <!-- now playing -->
+  <!-- now playing (status pill lives inside, so the version is always visible) -->
   <footer id="nowplaying" class="glass">
     <div id="np-meta">
       <div id="np-title">not tuned in</div>
       <div id="np-sub"><span id="np-genre"></span><span id="np-moods" class="moods"></span></div>
     </div>
-    <div id="np-center">
-      <div id="np-buttons">
-        <button id="btn-prev" title="previous">&#9198;</button>
-        <button id="btn-play" title="play / pause">&#9654;</button>
-        <button id="btn-next" title="next">&#9197;</button>
-        <button id="btn-shuffle" class="on" title="shuffle">&#10227;</button>
-      </div>
-      <div id="np-progress">
-        <div id="np-bar"><div id="np-fill"></div></div>
-        <span id="np-time">0:00 / 0:00</span>
-      </div>
+    <div id="np-buttons">
+      <button id="btn-prev" title="previous">&#9198;</button>
+      <button id="btn-play" title="play / pause">&#9654;</button>
+      <button id="btn-next" title="next">&#9197;</button>
+      <button id="btn-shuffle" class="on" title="shuffle">&#10227;</button>
     </div>
-    <div id="np-vol">
-      <span>&#128266;</span>
-      <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" />
+    <div id="np-progress">
+      <div id="np-bar"><div id="np-fill"></div></div>
+      <span id="np-time">0:00 / 0:00</span>
+    </div>
+    <div id="np-side">
+      <div id="status"><span id="status-dot"></span><span id="status-text">connecting…</span></div>
+      <div id="np-vol">
+        <span>&#128266;</span>
+        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" />
+      </div>
     </div>
   </footer>
-
-  <div id="status" class="glass"><span id="status-dot"></span><span id="status-text">connecting…</span></div>
 
   <!-- gentle onboarding hint (fades out on its own) -->
   <div id="hint">drag to spin &middot; scroll to zoom &middot; click a planet to tune in</div>
@@ -145,7 +147,7 @@
       }
     }, 25000);
   </script>
-  <script type="module" src="main.js?v=1.1.1"></script>
-  <script type="module" src="chat.js?v=1.1.2"></script>
+  <script type="module" src="main.js?v=1.2.0"></script>
+  <script type="module" src="chat.js?v=1.2.0"></script>
 </body>
 </html>

@@ -61,12 +61,28 @@ let selectedGenre = null;
 let selectedMood = null;
 let searchTerm = "";
 let shuffle = true;
+let pendingFile = localStorage.getItem("signal_pending_play") || null;
 
 // ---------------------------------------------------------------- audio
+// Exactly ONE <audio> element is ever the voice. isPlaying is the user's
+// intent; the element must never be started against it (that was the bug
+// where a track would start on its own while the player was paused, and
+// ended+error double-firing would jump the queue and flicker the hero).
 const audio = new Audio();
 audio.crossOrigin = "anonymous";
 audio.volume = 0.8;
 let actx = null, analyser = null, freqData = null, audioLevel = 0;
+let isPlaying = false;
+let lastAdvance = 0;
+let errStreak = 0;
+
+function setPlaying(p) {
+  isPlaying = p;
+  if (p && actx && actx.state === "suspended") actx.resume();
+  if ("mediaSession" in navigator) {
+    try { navigator.mediaSession.playbackState = p ? "playing" : "paused"; } catch (e) {}
+  }
+}
 
 function ensureAnalyser() {
   if (actx) return;
@@ -104,22 +120,114 @@ function playIndex(i) {
   qIndex = (i + queue.length) % queue.length;
   const t = queue[qIndex];
   ensureAnalyser();
-  if (actx && actx.state === "suspended") actx.resume();
+  audio.pause();                 // stop whatever was loaded — one voice only
   audio.src = trackURL(t);
-  audio.play().catch(() => {});
+  audio.load();
   updateNowPlaying(t);
+  if (isPlaying) audio.play().catch(() => {});
 }
 function startQueue() {
   if (!pool.length) { setStatus(false, "no tracks match"); return; }
   queue = pool.slice();
   if (shuffle) shuffleArr(queue);
+  if (pendingFile) {
+    const i = queue.findIndex(t => t.file === pendingFile);
+    if (i >= 0) { queue.unshift(queue.splice(i, 1)[0]); localStorage.removeItem("signal_pending_play"); pendingFile = null; }
+  }
+  setPlaying(true);
   playIndex(0);
 }
 function next() { if (queue.length) playIndex(qIndex + 1); }
 function prev() { if (queue.length) playIndex(qIndex - 1); }
 
-audio.addEventListener("ended", () => next());
-audio.addEventListener("error", () => next());
+function autoAdvance() {
+  const now = performance.now();
+  if (now - lastAdvance < 1500) return;   // debounce: ended+error fire together
+  lastAdvance = now;
+  next();
+}
+audio.addEventListener("playing", () => {
+  errStreak = 0;
+  setPlaying(true);
+});
+audio.addEventListener("ended", () => { if (isPlaying) autoAdvance(); });
+audio.addEventListener("error", () => {
+  if (!isPlaying) return;               // never auto-play from a paused state
+  errStreak++;
+  if (errStreak >= 3) {
+    setPlaying(false);
+    setStatus(false, "audio unreachable — check connection");
+    return;
+  }
+  autoAdvance();
+});
+
+// ---------------------------------------------------------------- media session
+// Lock-screen / notification controls + the signal the OS needs to keep the
+// audio alive when the phone is locked (background playback).
+const artCache = {};
+function makeArtwork(color) {
+  const key = "#" + color.getHexString();
+  if (artCache[key]) return artCache[key];
+  const c = document.createElement("canvas");
+  c.width = c.height = 512;
+  const x = c.getContext("2d");
+  const g = x.createRadialGradient(256, 256, 40, 256, 256, 360);
+  g.addColorStop(0, key);
+  g.addColorStop(1, "#0a0a1c");
+  x.fillStyle = g;
+  x.fillRect(0, 0, 512, 512);
+  x.fillStyle = key;
+  x.beginPath();
+  x.arc(256, 256, 118, 0, Math.PI * 2);
+  x.fill();
+  x.save();
+  x.translate(256, 256);
+  x.rotate(-0.35);
+  x.strokeStyle = "rgba(255,255,255,0.55)";
+  x.lineWidth = 16;
+  x.beginPath();
+  x.ellipse(0, 0, 205, 72, 0, 0, Math.PI * 2);
+  x.stroke();
+  x.restore();
+  const url = c.toDataURL("image/jpeg", 0.85);
+  artCache[key] = url;
+  return url;
+}
+function updateMediaSession(t) {
+  if (!("mediaSession" in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: t.title,
+      artist: t.genre.replace(/_/g, " "),
+      album: "SIGNAL — Radio Hub",
+      artwork: [{ src: makeArtwork(genreColor(t.genre)), sizes: "512x512", type: "image/jpeg" }]
+    });
+  } catch (e) {}
+}
+if ("mediaSession" in navigator) {
+  const ms = navigator.mediaSession;
+  const handlers = {
+    play: () => { if (audio.paused) document.getElementById("btn-play").click(); },
+    pause: () => { if (!audio.paused) document.getElementById("btn-play").click(); },
+    previoustrack: () => prev(),
+    nexttrack: () => next(),
+    seekbackward: () => { if (isFinite(audio.duration)) audio.currentTime = Math.max(0, audio.currentTime - 10); },
+    seekforward: () => { if (isFinite(audio.duration)) audio.currentTime = Math.min(audio.duration, audio.currentTime + 10); }
+  };
+  for (const [action, fn] of Object.entries(handlers)) {
+    try { ms.setActionHandler(action, fn); } catch (e) {}
+  }
+}
+// Screen locked / tab hidden: keep playing. When we come back, make sure the
+// context is running again (iOS suspends it aggressively).
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (isPlaying) {
+    if (actx && actx.state === "suspended") actx.resume();
+    if (audio.paused) audio.play().catch(() => {});
+  }
+});
 
 // ---------------------------------------------------------------- filters
 function applyFilter(restart = true) {
@@ -448,11 +556,12 @@ function updateNowPlaying(t) {
   heroLight.color.copy(heroColor);
   if (!hero.visible) {
     hero.visible = true; heroRing.visible = true; trail.visible = true; heroLight.visible = true;
-    trailHist.length = 0;
   }
+  trailHist.length = 0;   // every track gets a fresh trail — never two at once
   heroLabelTitle.textContent = t.title;
   heroLabelGenre.textContent = t.genre.replace(/_/g, " ");
   document.documentElement.style.setProperty("--np-color", "#" + heroColor.getHexString());
+  updateMediaSession(t);
 }
 function setStatus(ok, text) {
   statusDot.className = ok ? "ok" : "bad";
@@ -462,8 +571,13 @@ function setStatus(ok, text) {
 // controls
 document.getElementById("btn-play").onclick = () => {
   ensureAnalyser();
-  if (audio.paused) { if (actx && actx.state === "suspended") actx.resume(); audio.play().catch(() => {}); }
-  else audio.pause();
+  if (audio.paused) {
+    if (!audio.src && queue.length) playIndex(qIndex >= 0 ? qIndex : 0);
+    else { setPlaying(true); audio.play().catch(() => {}); }
+  } else {
+    setPlaying(false);
+    audio.pause();
+  }
 };
 document.getElementById("btn-next").onclick = next;
 document.getElementById("btn-prev").onclick = prev;
@@ -474,7 +588,7 @@ document.getElementById("btn-shuffle").onclick = (e) => {
 };
 document.getElementById("surprise").onclick = () => {
   if (!pool.length) applyFilter(false);
-  if (pool.length) playIndex((Math.random() * pool.length) | 0);
+  if (pool.length) { setPlaying(true); playIndex((Math.random() * pool.length) | 0); }
 };
 document.getElementById("vol").oninput = (e) => { audio.volume = parseFloat(e.target.value); };
 document.getElementById("search").oninput = (e) => { searchTerm = e.target.value.trim(); applyFilter(true); };
@@ -483,14 +597,12 @@ document.getElementById("np-bar").onclick = (e) => {
   const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
   if (isFinite(audio.duration)) audio.currentTime = f * audio.duration;
 };
-document.getElementById("stations-toggle").onclick = () => {
-  document.getElementById("stations").style.display = "none";
-  document.getElementById("stations-open").hidden = false;
-};
-document.getElementById("stations-open").onclick = () => {
-  document.getElementById("stations").style.display = "flex";
-  document.getElementById("stations-open").hidden = true;
-};
+function setStations(open) {
+  document.getElementById("stations").classList.toggle("closed", !open);
+  document.getElementById("stations-open").hidden = open;
+}
+document.getElementById("stations-toggle").onclick = () => setStations(false);
+document.getElementById("stations-open").onclick = () => setStations(true);
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); document.getElementById("btn-play").click(); }
   if (e.code === "ArrowRight") next();
@@ -506,15 +618,28 @@ function tickProgress() {
   const playing = !audio.paused;
   document.getElementById("btn-play").innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
 }
-setInterval(tickProgress, 250);
+// Lock-screen position, throttled (the per-frame tick above is UI-only).
+setInterval(() => {
+  tickProgress();
+  if ("mediaSession" in navigator && navigator.mediaSession.setPositionState &&
+      isFinite(audio.duration) && audio.duration > 0) {
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: audio.duration, playbackRate: 1, position: Math.min(audio.currentTime, audio.duration)
+      });
+    } catch (e) {}
+  }
+}, 250);
 
 // ---------------------------------------------------------------- boot
+const VERSION = (document.title.match(/v(\d+\.\d+\.\d+)/) || [null, ""])[1];
 buildStationList();
 buildVibes();
 syncUI();
-setStatus(true, CATALOG.length + " tracks · via " + (AUDIO_BASE.includes("trycloudflare") ? "tunnel" : "LAN"));
+setStatus(true, CATALOG.length + " tracks · via " + (AUDIO_BASE.includes("trycloudflare") ? "tunnel" : "LAN") + (VERSION ? " · v" + VERSION : ""));
 if (window.__signalBootTimeout) { clearTimeout(window.__signalBootTimeout); window.__signalBootTimeout = null; }
 document.getElementById("loading").classList.add("hidden");
+if (window.matchMedia("(max-width: 760px)").matches) setStations(false);
 applyFilter(true);
 
 window.addEventListener("resize", () => {
