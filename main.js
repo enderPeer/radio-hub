@@ -16,6 +16,7 @@ function showFatal(err) {
   if (window.console) console.error("SIGNAL fatal:", err);
 }
 
+let CONFIG = null;
 try {
 // ---------------------------------------------------------------- config
 function fetchWithTimeout(url, ms) {
@@ -48,7 +49,7 @@ async function loadCatalog(cfg) {
 }
 
 // ---------------------------------------------------------------- state
-const CONFIG = await loadConfig();
+CONFIG = await loadConfig();
 const LOADED = await loadCatalog(CONFIG);
 const CATALOG = LOADED.data;
 let AUDIO_BASE = LOADED.base;
@@ -135,184 +136,239 @@ function applyFilter(restart = true) {
   if (restart) startQueue();
 }
 
-// ---------------------------------------------------------------- three.js
+// ---------------------------------------------------------------- three.js — a playful little solar system
+function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
+function genreColor(name) {
+  const hue = (Math.abs(hashStr(name)) % 360) / 360;
+  return new THREE.Color().setHSL(hue, 0.82, 0.6);
+}
+
 const canvas = document.getElementById("scene");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x05060a);
-scene.fog = new THREE.FogExp2(0x05060a, 0.016);
+scene.background = new THREE.Color(0x0a0a1c);
+scene.fog = new THREE.FogExp2(0x0a0a1c, 0.011);
 
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 400);
-camera.position.set(0, 7, 22);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 10, 27);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 5, 0);
+controls.target.set(0, 4, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 0.5;
-controls.minDistance = 8;
-controls.maxDistance = 60;
-controls.maxPolarAngle = Math.PI * 0.85;
+controls.autoRotateSpeed = 0.4;
+controls.minDistance = 9;
+controls.maxDistance = 80;
+controls.maxPolarAngle = Math.PI * 0.9;
 
 // lights
-scene.add(new THREE.AmbientLight(0x334466, 0.7));
-const keyLight = new THREE.PointLight(0x46e0ff, 3.2, 60);
-keyLight.position.set(0, 9, 0);
-scene.add(keyLight);
-const rimLight = new THREE.PointLight(0xb06bff, 1.6, 80);
-rimLight.position.set(14, 6, -10);
+scene.add(new THREE.AmbientLight(0x5566aa, 0.9));
+const coreLight = new THREE.PointLight(0x46e0ff, 5, 140, 1.5);
+coreLight.position.set(0, 4, 0);
+scene.add(coreLight);
+const rimLight = new THREE.PointLight(0xff7ad9, 2.0, 120);
+rimLight.position.set(20, 10, -16);
 scene.add(rimLight);
 
-// starfield
-{
-  const N = 1600;
-  const pos = new Float32Array(N * 3);
-  for (let i = 0; i < N; i++) {
-    const r = 60 + Math.random() * 120;
+// starfield (two layers for depth)
+function makeStars(count, rMin, rMax, size, color, opacity) {
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = rMin + Math.random() * (rMax - rMin);
     const th = Math.random() * Math.PI * 2;
     const ph = Math.acos(2 * Math.random() - 1);
     pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
-    pos[i * 3 + 1] = r * Math.cos(ph) * 0.6;
+    pos[i * 3 + 1] = r * Math.cos(ph) * 0.7;
     pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  const m = new THREE.PointsMaterial({ color: 0x9fb6e6, size: 0.28, sizeAttenuation: true, transparent: true, opacity: 0.8 });
-  scene.add(new THREE.Points(g, m));
+  const m = new THREE.PointsMaterial({ color, size, sizeAttenuation: true, transparent: true, opacity, depthWrite: false });
+  const p = new THREE.Points(g, m);
+  scene.add(p);
+  return p;
 }
+const stars1 = makeStars(2400, 70, 240, 0.55, 0xbfd4ff, 0.9);
+const stars2 = makeStars(520, 60, 190, 1.2, 0xffd9a0, 0.75);
 
-// ground grid
-{
-  const grid = new THREE.GridHelper(120, 60, 0x1b2b4a, 0x101a30);
-  grid.position.y = -2;
-  grid.material.transparent = true;
-  grid.material.opacity = 0.5;
-  scene.add(grid);
-}
-
-// central tower
-const tower = new THREE.Group();
-{
-  const mast = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14, 0.26, 7.5, 14),
-    new THREE.MeshStandardMaterial({ color: 0x2a3a5a, metalness: 0.7, roughness: 0.35, emissive: 0x0a1424 })
-  );
-  mast.position.y = 3.75;
-  tower.add(mast);
-  const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.1, 1.5, 0.5, 24),
-    new THREE.MeshStandardMaterial({ color: 0x1a2740, metalness: 0.6, roughness: 0.5 })
-  );
-  base.position.y = 0.25;
-  tower.add(base);
-}
-const emitter = new THREE.Mesh(
-  new THREE.SphereGeometry(0.7, 32, 32),
-  new THREE.MeshStandardMaterial({ color: 0x46e0ff, emissive: 0x46e0ff, emissiveIntensity: 1.4, roughness: 0.2 })
+// ---------------------------------------------------------------- the core (music-reactive heart)
+const coreGroup = new THREE.Group();
+coreGroup.position.set(0, 4, 0);
+const CORE_R = 2.7;
+const core = new THREE.Mesh(
+  new THREE.SphereGeometry(CORE_R, 48, 48),
+  new THREE.MeshStandardMaterial({ color: 0x46e0ff, emissive: 0x46e0ff, emissiveIntensity: 1.2, roughness: 0.25, metalness: 0.1 })
 );
-emitter.position.y = 8.2;
-tower.add(emitter);
-const tip = new THREE.Mesh(
-  new THREE.SphereGeometry(0.16, 16, 16),
-  new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2 })
+coreGroup.add(core);
+const halo = new THREE.Mesh(
+  new THREE.SphereGeometry(CORE_R * 1.4, 48, 48),
+  new THREE.MeshBasicMaterial({ color: 0x46e0ff, transparent: true, opacity: 0.14, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })
 );
-tip.position.y = 9.1;
-tower.add(tip);
-scene.add(tower);
+coreGroup.add(halo);
+scene.add(coreGroup);
 
-// expanding signal rings
+// expanding signal rings (music-coloured)
 const rings = [];
 for (let i = 0; i < 4; i++) {
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1, 0.05, 8, 64),
-    new THREE.MeshBasicMaterial({ color: 0x46e0ff, transparent: true, opacity: 0.5 })
+    new THREE.TorusGeometry(1, 0.05, 8, 90),
+    new THREE.MeshBasicMaterial({ color: 0x46e0ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
   );
-  ring.position.y = 8.2;
   ring.rotation.x = Math.PI / 2;
   ring.userData.phase = i / 4;
-  scene.add(ring);
+  coreGroup.add(ring);
   rings.push(ring);
 }
 
-// genre nodes
+// ---------------------------------------------------------------- the hero planet (the track that is playing)
+const heroGroup = new THREE.Group();
+heroGroup.position.y = 4;
+const HERO_R = 5.7;
+const hero = new THREE.Mesh(
+  new THREE.SphereGeometry(0.95, 32, 32),
+  new THREE.MeshStandardMaterial({ color: 0x46e0ff, emissive: 0x46e0ff, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.1 })
+);
+heroGroup.add(hero);
+const heroRing = new THREE.Mesh(
+  new THREE.TorusGeometry(HERO_R, 0.035, 8, 140),
+  new THREE.MeshBasicMaterial({ color: 0x46e0ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })
+);
+heroRing.rotation.x = Math.PI / 2;
+heroGroup.add(heroRing);
+const TRAIL_N = 56;
+const trailPos = new Float32Array(TRAIL_N * 3);
+const trailCol = new Float32Array(TRAIL_N * 3);
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
+trailGeo.setAttribute("color", new THREE.BufferAttribute(trailCol, 3));
+const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+heroGroup.add(trail);
+const heroLight = new THREE.PointLight(0x46e0ff, 1.6, 26);
+heroGroup.add(heroLight);
+hero.visible = false; heroRing.visible = false; trail.visible = false; heroLight.visible = false;
+scene.add(heroGroup);
+let heroAngle = 0;
+const heroColor = new THREE.Color(0x46e0ff);
+const trailHist = [];
+
+const heroLabelEl = document.getElementById("hero-label");
+const heroLabelTitle = heroLabelEl.querySelector("b");
+const heroLabelGenre = heroLabelEl.querySelector("small");
+const tooltipEl = document.getElementById("tooltip");
+const _proj = new THREE.Vector3();
+function placeProjected(el, obj) {
+  obj.getWorldPosition(_proj);
+  _proj.project(camera);
+  if (_proj.z > 1) { el.style.opacity = "0"; return; }
+  const x = (_proj.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-_proj.y * 0.5 + 0.5) * window.innerHeight;
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+  el.style.opacity = "1";
+}
+
+// ---------------------------------------------------------------- genre planets (the catalog, as a starfield of worlds)
 function makeLabel(text, css) {
   const c = document.createElement("canvas");
   const ctx = c.getContext("2d");
-  const font = "700 46px 'Segoe UI', sans-serif";
+  const font = "700 46px 'Segoe UI', system-ui, sans-serif";
   ctx.font = font;
-  const w = Math.ceil(ctx.measureText(text).width) + 28;
+  const w = Math.ceil(ctx.measureText(text).width) + 30;
   c.width = w; c.height = 64;
   ctx.font = font;
   ctx.fillStyle = css;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
-  ctx.fillText(text, 14, 33);
+  ctx.fillText(text, 15, 34);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-  sp.scale.set((w / 64) * 1.7, 1.7, 1);
+  sp.scale.set((w / 64) * 1.8, 1.8, 1);
   return sp;
 }
 
 const genreCounts = {};
 for (const t of CATALOG) genreCounts[t.genre] = (genreCounts[t.genre] || 0) + 1;
 const allGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]);
-const TOP_N = 18;
+const TOP_N = 22;
 const topGenres = allGenres.slice(0, TOP_N);
 
-const nodeGroup = new THREE.Group();
-const nodeMeshes = [];
-const RADIUS = 13;
-topGenres.forEach(([genre, count], i) => {
-  const ang = (i / topGenres.length) * Math.PI * 2;
-  const hue = i / topGenres.length;
-  const color = new THREE.Color().setHSL(hue, 0.75, 0.55);
-  const mesh = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.85, 0),
-    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.55, roughness: 0.3, metalness: 0.3, flatShading: true })
+const planetGroup = new THREE.Group();
+planetGroup.position.y = 4;
+const planetMeshes = [];
+const SHELLS = [9.5, 13, 16.5];
+for (const r of SHELLS) {
+  const guide = new THREE.Mesh(
+    new THREE.TorusGeometry(r, 0.02, 6, 140),
+    new THREE.MeshBasicMaterial({ color: 0x4a5a8a, transparent: true, opacity: 0.28, depthWrite: false })
   );
-  mesh.position.set(Math.cos(ang) * RADIUS, 4, Math.sin(ang) * RADIUS);
-  mesh.userData = { genre, count, baseY: 4, idx: i, color };
-  const label = makeLabel(genre.replace(/_/g, " "), "#e8eefc");
-  label.position.set(0, 1.9, 0);
+  guide.rotation.x = Math.PI / 2;
+  planetGroup.add(guide);
+}
+topGenres.forEach(([genre, count], i) => {
+  const color = genreColor(genre);
+  const shell = SHELLS[i % SHELLS.length];
+  const perShell = Math.ceil(topGenres.length / SHELLS.length);
+  const idxInShell = Math.floor(i / SHELLS.length);
+  const ang = (idxInShell / perShell) * Math.PI * 2 + (i % SHELLS.length) * 0.7;
+  const size = 0.55 + Math.min(count, 50) / 50 * 0.7;
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 28, 28),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5, roughness: 0.35, metalness: 0.15 })
+  );
+  mesh.position.set(Math.cos(ang) * shell, 0, Math.sin(ang) * shell);
+  mesh.userData = { genre, count, color, size, bob: Math.random() * Math.PI * 2 };
+  const label = makeLabel(genre.replace(/_/g, " "), "#eaf1ff");
+  label.position.set(0, size + 1.2, 0);
+  label.visible = false;
   mesh.add(label);
-  nodeGroup.add(mesh);
-  nodeMeshes.push(mesh);
+  planetGroup.add(mesh);
+  planetMeshes.push(mesh);
 });
-scene.add(nodeGroup);
+scene.add(planetGroup);
 
-// raycasting
+// ---------------------------------------------------------------- raycasting (hover + click a planet)
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let hovered = null;
-function pickNode(e) {
+function pickPlanet(e) {
   const rect = canvas.getBoundingClientRect();
   pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
-  const hits = raycaster.intersectObjects(nodeMeshes, false);
+  const hits = raycaster.intersectObjects(planetMeshes, false);
   return hits.length ? hits[0].object : null;
 }
 canvas.addEventListener("pointermove", (e) => {
-  const n = pickNode(e);
+  const n = pickPlanet(e);
   if (n !== hovered) {
     hovered = n;
     canvas.style.cursor = n ? "pointer" : "default";
+    if (n) {
+      tooltipEl.querySelector("b").textContent = n.userData.genre.replace(/_/g, " ");
+      tooltipEl.querySelector("small").textContent = n.userData.count + " tracks · tap to tune in";
+      tooltipEl.style.opacity = "1";
+    } else {
+      tooltipEl.style.opacity = "0";
+    }
+  }
+  if (hovered) {
+    tooltipEl.style.left = e.clientX + "px";
+    tooltipEl.style.top = (e.clientY + 18) + "px";
   }
 });
 canvas.addEventListener("click", (e) => {
   if (e.target !== canvas) return;
-  const n = pickNode(e);
+  const n = pickPlanet(e);
   if (n) selectGenre(n.userData.genre);
 });
 
 function selectGenre(genre) {
   selectedGenre = (selectedGenre === genre) ? null : genre;
-  // clear mood when choosing a specific station (keeps the pool sensible)
   selectedMood = null;
   syncUI();
   applyFilter(true);
@@ -337,19 +393,18 @@ function buildStationList() {
   free.onclick = () => { selectedGenre = null; syncUI(); applyFilter(true); };
   stationList.appendChild(free);
   for (const [genre, count] of allGenres) {
-    const hue = Math.abs(hashStr(genre)) % 360;
+    const hue = (Math.abs(hashStr(genre)) % 360);
     const el = document.createElement("div");
     el.className = "station";
     el.dataset.genre = genre;
-    const sw = "hsl(" + hue + ",80%,60%)";
+    const sw = "hsl(" + hue + ",80%,62%)";
     el.innerHTML =
-      `<span class="name"><span class="swatch" style="color:${sw};background:${sw}"></span>` +
-      genre.replace(/_/g, " ") + `</span><span class="count">${count}</span>`;
+      '<span class="name"><span class="swatch" style="color:' + sw + ";background:" + sw + '"></span>' +
+      genre.replace(/_/g, " ") + '</span><span class="count">' + count + "</span>";
     el.onclick = () => selectGenre(genre);
     stationList.appendChild(el);
   }
 }
-function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
 function buildVibes() {
   const moodCounts = {};
@@ -378,11 +433,6 @@ function syncUI() {
     const m = el.dataset.mood;
     el.classList.toggle("active", m ? m === selectedMood : selectedMood === null);
   });
-  nodeMeshes.forEach(n => {
-    const on = n.userData.genre === selectedGenre;
-    n.material.emissiveIntensity = on ? 1.6 : 0.55;
-    n.scale.setScalar(on ? 1.5 : 1.0);
-  });
 }
 
 function fmt(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
@@ -390,6 +440,19 @@ function updateNowPlaying(t) {
   npTitle.textContent = t.title;
   npGenre.textContent = t.genre.replace(/_/g, " ");
   npMoods.innerHTML = t.moods.slice(0, 4).map(m => "<span>" + m + "</span>").join("");
+  // the playing track becomes the hero planet
+  heroColor.copy(genreColor(t.genre));
+  hero.material.color.copy(heroColor);
+  hero.material.emissive.copy(heroColor);
+  heroRing.material.color.copy(heroColor);
+  heroLight.color.copy(heroColor);
+  if (!hero.visible) {
+    hero.visible = true; heroRing.visible = true; trail.visible = true; heroLight.visible = true;
+    trailHist.length = 0;
+  }
+  heroLabelTitle.textContent = t.title;
+  heroLabelGenre.textContent = t.genre.replace(/_/g, " ");
+  document.documentElement.style.setProperty("--np-color", "#" + heroColor.getHexString());
 }
 function setStatus(ok, text) {
   statusDot.className = ok ? "ok" : "bad";
@@ -460,36 +523,91 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ---------------------------------------------------------------- loop
+// ---------------------------------------------------------------- the living loop
 const clock = new THREE.Clock();
+let coreHue = 0.55;
+const coreColor = new THREE.Color();
 function animate() {
   requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.getElapsedTime();
   sampleLevel();
 
-  controls.update();
-  nodeGroup.rotation.y = t * 0.06;
-  for (const n of nodeMeshes) {
-    n.position.y = n.userData.baseY + Math.sin(t * 1.2 + n.userData.idx) * 0.25;
-    if (n === hovered && n.userData.genre !== selectedGenre) n.scale.setScalar(1.25);
-    else if (n.userData.genre !== selectedGenre) n.scale.setScalar(1.0);
-  }
-  const pulse = 1 + 0.12 * Math.sin(t * 2.4) + audioLevel * 0.9;
-  emitter.scale.setScalar(pulse);
-  emitter.material.emissiveIntensity = 1.2 + audioLevel * 3.5;
-  keyLight.intensity = 2.6 + audioLevel * 6;
+  // audio bands
+  let bass = 0;
+  if (freqData) { for (let i = 0; i < 10; i++) bass += freqData[i]; bass /= 10 * 255; }
+  let num = 0, den = 0;
+  if (freqData) { for (let i = 0; i < freqData.length; i++) { num += i * freqData[i]; den += freqData[i]; } }
+  const centroid = den ? (num / den) / freqData.length : 0;
+
+  // the core breathes and changes colour with the music
+  coreHue = (coreHue + dt * (0.02 + audioLevel * 0.06) + (centroid - 0.45) * 0.0004) % 1;
+  if (coreHue < 0) coreHue += 1;
+  coreColor.setHSL(coreHue, 0.85, 0.55);
+  core.material.color.copy(coreColor);
+  core.material.emissive.copy(coreColor);
+  core.material.emissiveIntensity = 0.9 + audioLevel * 2.6;
+  const pulse = 1 + 0.08 * audioLevel + 0.18 * bass;
+  core.scale.setScalar(pulse);
+  halo.material.color.copy(coreColor);
+  halo.material.opacity = 0.1 + audioLevel * 0.2;
+  halo.scale.setScalar(pulse);
+  coreLight.color.copy(coreColor);
+  coreLight.intensity = 3 + audioLevel * 8 + bass * 5;
+  coreGroup.rotation.y += dt * 0.15;
+
+  // expanding signal rings
   for (const r of rings) {
-    const ph = (t * 0.45 + r.userData.phase) % 1;
-    const s = 1 + ph * 6;
+    const ph = (t * 0.5 + r.userData.phase) % 1;
+    const s = CORE_R * (1 + ph * 4.5);
     r.scale.set(s, s, 1);
-    r.material.opacity = (1 - ph) * 0.55;
+    r.material.opacity = (1 - ph) * (0.3 + audioLevel * 0.5);
+    r.material.color.copy(coreColor);
   }
+
+  // genre planets drift, bob, and glow when selected
+  planetGroup.rotation.y += dt * 0.05;
+  for (const n of planetMeshes) {
+    n.position.y = Math.sin(t * 1.1 + n.userData.bob) * 0.4;
+    n.rotation.y += dt * 0.35;
+    const on = n.userData.genre === selectedGenre;
+    const target = on ? 1.6 : 1.0;
+    n.scale.setScalar(n.scale.x + (target - n.scale.x) * 0.15);
+    const eiTarget = on ? 1.5 : 0.5;
+    n.material.emissiveIntensity += (eiTarget - n.material.emissiveIntensity) * 0.15;
+    n.children[0].visible = (n === hovered) || on;
+  }
+
+  // the hero planet orbits the core, leaving a glowing trail
+  if (hero.visible) {
+    heroAngle += dt * 0.55;
+    const hy = Math.sin(t * 1.3) * 0.3;
+    hero.position.set(Math.cos(heroAngle) * HERO_R, hy, Math.sin(heroAngle) * HERO_R);
+    hero.rotation.y += dt * 0.6;
+    hero.scale.setScalar(1 + 0.14 * audioLevel);
+    heroLight.position.copy(hero.position);
+    trailHist.unshift(hero.position.clone());
+    if (trailHist.length > TRAIL_N) trailHist.pop();
+    for (let i = 0; i < TRAIL_N; i++) {
+      const p = trailHist[Math.min(i, trailHist.length - 1)];
+      trailPos[i * 3] = p.x; trailPos[i * 3 + 1] = p.y; trailPos[i * 3 + 2] = p.z;
+      const f = 1 - i / TRAIL_N;
+      trailCol[i * 3] = heroColor.r * f; trailCol[i * 3 + 1] = heroColor.g * f; trailCol[i * 3 + 2] = heroColor.b * f;
+    }
+    trailGeo.attributes.position.needsUpdate = true;
+    trailGeo.attributes.color.needsUpdate = true;
+    placeProjected(heroLabelEl, hero);
+  }
+
+  stars1.rotation.y += dt * 0.005;
+  stars2.rotation.y -= dt * 0.004;
+
+  controls.update();
   tickProgress();
   renderer.render(scene, camera);
 }
 animate();
-
-export { CONFIG };
 } catch (e) {
   showFatal(e);
 }
+export { CONFIG };

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SIGNAL v1.1.0 — Radio Hub</title>
+  <title>SIGNAL v1.1.1 — Radio Hub</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="chat.css" />
 </head>
@@ -13,7 +13,7 @@
   <!-- brand -->
   <header id="brand">
     <h1>SIGNAL<span class="dot">.</span></h1>
-    <p class="tag">radio hub v1.1.0 &middot; 564 original tracks + user requests &middot; pick a station or a vibe</p>
+    <p class="tag">your 564-track solar system &middot; every planet is a song &middot; request new worlds &middot; ride the vibe</p>
   </header>
 
   <!-- search + surprise -->
@@ -102,7 +102,16 @@
 
   <div id="status" class="glass"><span id="status-dot"></span><span id="status-text">connecting…</span></div>
 
-  <div id="loading" class="glass"><div class="spinner"></div><p>loading the signal…</p></div>
+  <!-- gentle onboarding hint (fades out on its own) -->
+  <div id="hint">drag to spin &middot; scroll to zoom &middot; click a planet to tune in</div>
+
+  <!-- floating label that follows the hero planet (the track in orbit) -->
+  <div id="hero-label"><b>&nbsp;</b><small>&nbsp;</small></div>
+
+  <!-- hover tooltip for genre planets -->
+  <div id="tooltip"><b></b><small></small></div>
+
+  <div id="loading" class="glass"><div class="orb"></div><p>waking the signal…</p></div>
 
   <script>
     // Runs BEFORE the module, so it also surfaces static-import / parse failures
@@ -136,7 +145,7 @@
       }
     }, 25000);
   </script>
-  <script type="module" src="main.js?v=1.1.0"></script>
-  <script type="module" src="chat.js?v=1.1.0"></script>
+  <script type="module" src="main.js?v=1.1.1"></script>
+  <script type="module" src="chat.js?v=1.1.1"></script>
 </body>
 </html>
