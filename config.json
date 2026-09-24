@@ -1,6 +1,6 @@
 {
-  "audioBase": "https://timeline-pleasant-modified-peripherals.trycloudflare.com",
-  "lanFallback": "http://192.168.178.200:7784",
-  "updatedAt": "2026-09-16T08:35:00Z",
+  "audioBase": "https://dealer-migration-for-grande.trycloudflare.com",
+  "lanFallback": "http://192.168.178.187:7784",
+  "updatedAt": "2026-09-24T11:05:44Z",
   "note": "audioBase is the current Cloudflare quick-tunnel URL and changes when the tunnel restarts. The watchdog updates this file and pushes it to the repo. lanFallback is used automatically on the LAN if the tunnel is unreachable."
 }
